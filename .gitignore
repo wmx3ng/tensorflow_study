@@ -1,2 +1,3 @@
 .idea/
 **/dbpedia_data
+/englory_news_classify/MNIST-data/
