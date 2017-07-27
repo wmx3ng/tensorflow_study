@@ -56,7 +56,7 @@ with open(poetry_file, "r", encoding='utf-8', ) as f:
 
 # 按诗的字数排序
 poetrys = sorted(poetrys, key=lambda line: len(line))
-logger.info('唐诗总数:%s', len(poetrys))
+logger.info('唐诗总数:%d', len(poetrys))
 
 # 统计每个字出现次数
 all_words = []

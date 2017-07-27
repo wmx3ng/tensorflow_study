@@ -37,7 +37,7 @@ tf.logging.set_verbosity(tf.logging.INFO)
 logger = get_logger(os.path.basename(__file__))
 
 poetry_file = '/home/wong/Documents/dataset/poetry/poetry.txt'
-model_dir = '/tmp/poetry_model/poetry.model-0'
+model_dir = '/tmp/poetry_model/poetry.model-105'
 
 # 诗集
 poetrys = []
@@ -57,7 +57,7 @@ with open(poetry_file, "r", encoding='utf-8', ) as f:
 
 # 按诗的字数排序
 poetrys = sorted(poetrys, key=lambda line: len(line))
-print('唐诗总数: ', len(poetrys))
+logger.info('唐诗总数: %d', len(poetrys))
 
 # 统计每个字出现次数
 all_words = []
@@ -161,7 +161,7 @@ def gen_poetry():
         word = to_word(probs_)
         # word = words[np.argmax(probs_)]
         poem = ''
-        while word != ']':
+        while word != '中':
             poem += word
             x = np.zeros((1, 1))
             x[0, 0] = word_num_map[word]
