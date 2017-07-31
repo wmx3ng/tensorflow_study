@@ -11,7 +11,7 @@
 import collections
 import logging
 import os
-
+import random
 import numpy as np
 import tensorflow as tf
 
@@ -55,7 +55,7 @@ with open(poetry_file, "r", encoding='utf-8', ) as f:
             pass
 
 # 按诗的字数排序
-poetrys = sorted(poetrys, key=lambda line: len(line))
+poetrys = list(set(sorted(poetrys, key=lambda line: len(line))))
 logger.info('唐诗总数:%d', len(poetrys))
 
 # 统计每个字出现次数
@@ -80,26 +80,33 @@ poetrys_vector = [list(map(to_num, poetry)) for poetry in poetrys]
 # 每次取64首诗进行训练
 batch_size = 64
 n_chunk = len(poetrys_vector) // batch_size
-x_batches = []
-y_batches = []
-for i in range(n_chunk):
-    start_index = i * batch_size
-    end_index = start_index + batch_size
 
-    batches = poetrys_vector[start_index:end_index]
-    length = max(map(len, batches))
-    xdata = np.full((batch_size, length), word_num_map[' '], np.int32)
-    for row in range(batch_size):
-        xdata[row, :len(batches[row])] = batches[row]
-    ydata = np.copy(xdata)
-    ydata[:, :-1] = xdata[:, 1:]
-    """
-    xdata             ydata
-    [6,2,4,6,9]       [2,4,6,9,9]
-    [1,4,2,8,5]       [4,2,8,5,5]
-    """
-    x_batches.append(xdata)
-    y_batches.append(ydata)
+
+def get_shuffle_list():
+    x_batches = []
+    y_batches = []
+    random.shuffle(poetrys_vector)
+    for i in range(n_chunk):
+        start_index = i * batch_size
+        end_index = start_index + batch_size
+
+        batches = poetrys_vector[start_index:end_index]
+        length = max(map(len, batches))
+        xdata = np.full((batch_size, length), word_num_map[' '], np.int32)
+        for row in range(batch_size):
+            xdata[row, :len(batches[row])] = batches[row]
+        ydata = np.copy(xdata)
+        ydata[:, :-1] = xdata[:, 1:]
+        """
+        xdata             ydata
+        [6,2,4,6,9]       [2,4,6,9,9]
+        [1,4,2,8,5]       [4,2,8,5,5]
+        """
+        x_batches.append(xdata)
+        y_batches.append(ydata)
+
+    return x_batches, y_batches
+
 
 # ---------------------------------------RNN--------------------------------------#
 
@@ -117,6 +124,7 @@ def neural_network(model='lstm', rnn_size=128, num_layers=2):
         cell_fun = tf.nn.rnn_cell.BasicLSTMCell
 
     cell = cell_fun(rnn_size, state_is_tuple=True)
+    cell = tf.nn.rnn_cell.DropoutWrapper(cell, output_keep_prob=0.5)
     cell = tf.nn.rnn_cell.MultiRNNCell([cell] * num_layers, state_is_tuple=True)
 
     initial_state = cell.zero_state(batch_size, tf.float32)
@@ -157,6 +165,7 @@ def train_neural_network():
 
         for epoch in range(50):
             sess.run(tf.assign(learning_rate, 0.002 * (0.97 ** epoch)))
+            x_batches, y_batches = get_shuffle_list()
             n = 0
             for batche in range(n_chunk):
                 train_loss, _, _ = sess.run([cost, last_state, train_op],

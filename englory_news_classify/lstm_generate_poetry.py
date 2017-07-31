@@ -15,6 +15,8 @@ import os
 import numpy as np
 import tensorflow as tf
 
+np.set_printoptions(threshold=np.inf)
+
 
 def get_logger(abspath):
     logger = logging.getLogger(abspath)
@@ -37,7 +39,7 @@ tf.logging.set_verbosity(tf.logging.INFO)
 logger = get_logger(os.path.basename(__file__))
 
 poetry_file = '/home/wong/Documents/dataset/poetry/poetry.txt'
-model_dir = '/tmp/poetry_model/poetry.model-105'
+model_dir = '/tmp/poetry_model/poetry.model-567'
 
 # 诗集
 poetrys = []
@@ -56,7 +58,7 @@ with open(poetry_file, "r", encoding='utf-8', ) as f:
             pass
 
 # 按诗的字数排序
-poetrys = sorted(poetrys, key=lambda line: len(line))
+poetrys = list(set(sorted(poetrys, key=lambda line: len(line))))
 logger.info('唐诗总数: %d', len(poetrys))
 
 # 统计每个字出现次数
@@ -82,6 +84,7 @@ batch_size = 1
 n_chunk = len(poetrys_vector) // batch_size
 x_batches = []
 y_batches = []
+
 for i in range(n_chunk):
     start_index = i * batch_size
     end_index = start_index + batch_size
@@ -132,6 +135,7 @@ def neural_network(model='lstm', rnn_size=128, num_layers=2):
     output = tf.reshape(outputs, [-1, rnn_size])
 
     logits = tf.matmul(output, softmax_w) + softmax_b
+
     probs = tf.nn.softmax(logits)
     return logits, last_state, probs, cell, initial_state
 
@@ -141,9 +145,15 @@ def neural_network(model='lstm', rnn_size=128, num_layers=2):
 
 def gen_poetry():
     def to_word(weights):
+        # 取概率最高的topN.
+        top_n = weights[0].argsort()[-10:][::-1]
+        top_words = [(words[i], weights[0][i]) for i in top_n]
+        logger.debug('top_n:%s', top_words)
         t = np.cumsum(weights)
         s = np.sum(weights)
-        sample = int(np.searchsorted(t, np.random.rand(1) * s))
+        # 产生的随机数使每次生成的都不同.
+        r = np.random.rand(1)
+        sample = int(np.searchsorted(t, r * s))
         return words[sample]
 
     _, last_state, probs, cell, initial_state = neural_network()
@@ -158,10 +168,13 @@ def gen_poetry():
 
         x = np.array([list(map(word_num_map.get, '['))])
         [probs_, state_] = sess.run([probs, last_state], feed_dict={input_data: x, initial_state: state_})
+        logger.info('probs_:%s', probs_)
+        logger.info('probs_size:%s', probs_.shape)
         word = to_word(probs_)
         # word = words[np.argmax(probs_)]
         poem = ''
-        while word != '中':
+        while word != ']' and word != ' ':
+            logger.debug('word:%s', word)
             poem += word
             x = np.zeros((1, 1))
             x[0, 0] = word_num_map[word]
@@ -171,4 +184,4 @@ def gen_poetry():
         return poem
 
 
-print(gen_poetry())
+logger.info('poetry:\r%s', gen_poetry())
